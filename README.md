@@ -1,19 +1,28 @@
 # AI Neon Avatar
 
-Fristående HTML-animation av en lysande AI-avatar med bärnstens- och guldfärgade toner på kroppen.
+En fristående HTML-animation av en lysande AI-avatar. Den senaste versionen har bärnsten/guld på kroppen, mjuk huvudvridning och en blixt som alltid börjar i pannans ljuspunkt och slår ned där du klickar.
 
-## Starta
+## Starta animationen
 
-1. Öppna `index.html` i Google Chrome eller Microsoft Edge.
-2. För muspekaren över animationen för att vrida huvudet mjukt.
-3. Klicka i fönstret för att aktivera blixt-/energieffekten.
+Öppna `index.html` direkt i Google Chrome eller Microsoft Edge. Ingen installation, server, API-nyckel eller internetanslutning krävs.
 
-Ingen installation, server, API-nyckel eller internetanslutning krävs.
+## Funktioner
 
-## Filer
+- Avataren andas och svävar subtilt, med rörliga neonlinjer och partiklar.
+- Huvudet följer musen med begränsad, mjuk perspektivvridning.
+- Vid klick startar en lila-vit blixt från ljuspunkten i pannan och slutar där du klickade.
+- Kroppens bildpixlar har en bärnstens-/guldfärgad ton utan stora synliga färgmaskfält runt huvudet.
+- HTML, CSS, JavaScript och bildresurser ligger i en och samma `index.html`.
 
-- `index.html` – komplett original-HTML från den senast godkända versionen, inklusive inbäddad grafik och JavaScript.
+## Projektfiler
 
-## Ändringsprincip
+- `index.html` — hela animationen, inklusive grafik och effekter.
+- `README.md` — den här beskrivningen och instruktionerna.
 
-Bevara befintliga funktioner vid framtida uppdateringar. Ändra endast den del som en ny uppgift gäller.
+## Uppdatera repositoryt på GitHub
+
+Ladda upp `index.html` och `README.md` i repositoryts rot (ersätt tidigare versioner) och välj **Commit changes**. Om du använder Git lokalt kan du i stället ersätta filerna och skapa en commit som vanligt.
+
+## Vidareutveckling
+
+Behåll övriga funktioner oförändrade när en enskild del uppdateras. Varje kodavsnitt har kommentarer som förklarar vad det gör.

@@ -421,79 +421,96 @@
     }
 
 
-    // 10A. Färgskifta kroppen från stark rosa till en kallare lila/orange ton.
-    //      Vi använder mjuka masker och blandningslägen i stället för att ändra
-    //      källbilden direkt, så resten av avataren fortsätter fungera som tidigare.
-    function bodyClipPath(box) {
-      ctx.beginPath();
-      ctx.moveTo(box.x + box.w * .17, box.y + box.h * .33);
-      ctx.bezierCurveTo(box.x + box.w * .26, box.y + box.h * .24,
-                        box.x + box.w * .40, box.y + box.h * .23,
-                        box.x + box.w * .45, box.y + box.h * .33);
-      ctx.bezierCurveTo(box.x + box.w * .48, box.y + box.h * .38,
-                        box.x + box.w * .52, box.y + box.h * .38,
-                        box.x + box.w * .55, box.y + box.h * .33);
-      ctx.bezierCurveTo(box.x + box.w * .60, box.y + box.h * .23,
-                        box.x + box.w * .74, box.y + box.h * .24,
-                        box.x + box.w * .83, box.y + box.h * .33);
-      ctx.lineTo(box.x + box.w * .93, box.y + box.h * .995);
-      ctx.lineTo(box.x + box.w * .07, box.y + box.h * .995);
-      ctx.closePath();
+    // 10A. Färgkorrigering för ENBART kroppens pixlar. Ingen transparent
+    //      polygon ritas över bakgrunden: den tidigare metoden orsakade
+    //      stora lila/bruna fält bakom håret. Denna variant ändrar enbart
+    //      färgen på valda pixlar i porträttbilden och behåller deras alfa.
+    //      Originalet används oförändrat för hår, huvud och bakgrund.
+    let goldPortrait = null;
+
+    // Mjuk interpolering för osynliga färgövergångar längs kroppen.
+    function smoothRange(a, b, value) {
+      return smooth(clamp((value - a) / (b - a), 0, 1));
     }
 
-    function applyBodyRecolor(box, t) {
-      ctx.save();
-      bodyClipPath(box);
-      ctx.clip();
+    function createGoldPortrait(image) {
+      const buffer = document.createElement('canvas');
+      buffer.width = image.naturalWidth;
+      buffer.height = image.naturalHeight;
+      const bctx = buffer.getContext('2d', { willReadFrequently: true });
+      if (!bctx) return image;
+      bctx.drawImage(image, 0, 0);
+      const bitmap = bctx.getImageData(0, 0, buffer.width, buffer.height);
+      const pixels = bitmap.data;
+      const width = bitmap.width;
+      const height = bitmap.height;
 
-      // Dämpa rosa/lila på kroppen utan att påverka hår, huvud eller bakgrund.
-      ctx.globalCompositeOperation = 'multiply';
-      const base = ctx.createLinearGradient(box.x, box.y + box.h * .24, box.x, box.y + box.h);
-      base.addColorStop(0, 'rgba(86, 52, 18, 0.18)');
-      base.addColorStop(.40, 'rgba(104, 62, 20, 0.24)');
-      base.addColorStop(.78, 'rgba(122, 72, 24, 0.28)');
-      base.addColorStop(1, 'rgba(74, 44, 18, 0.22)');
-      ctx.fillStyle = base;
-      ctx.fillRect(box.x, box.y, box.w, box.h);
+      // Byt hue på kroppens mättade rosa/violetta neonpixlar till guld.
+      // Varken transparenta bakgrundspixlar eller vita stjärnor ändras.
+      for (let y = 0; y < height; y++) {
+        const py = y / height;
+        if (py < .315) continue;
+        for (let x = 0; x < width; x++) {
+          const px = x / width;
+          const index = (y * width + x) * 4;
+          const alpha = pixels[index + 3] / 255;
+          if (alpha < .40) continue;
 
-      // Bygg upp en tydligare bärnsten/guldton över själva kroppen.
-      ctx.globalCompositeOperation = 'screen';
-      const amberWash = ctx.createLinearGradient(box.x + box.w * .18, box.y + box.h * .24,
-                                                 box.x + box.w * .78, box.y + box.h * .98);
-      amberWash.addColorStop(0, 'rgba(255, 194, 104, 0.15)');
-      amberWash.addColorStop(.30, 'rgba(255, 181, 82, 0.22)');
-      amberWash.addColorStop(.70, 'rgba(255, 169, 70, 0.28)');
-      amberWash.addColorStop(1, 'rgba(255, 154, 58, 0.20)');
-      ctx.fillStyle = amberWash;
-      ctx.fillRect(box.x, box.y, box.w, box.h);
+          // Halsen är smal; axlar och överkropp breder ut sig nedåt.
+          // Kanterna har breda, mjuka övergångar och ritas aldrig separat.
+          const neck = smoothRange(.320, .365, py)
+            * (1 - smoothRange(.465, .530, py))
+            * smoothRange(.415, .460, px)
+            * (1 - smoothRange(.540, .585, px));
+          const left = .205 - .085 * smoothRange(.46, .93, py);
+          const right = 1 - left;
+          const torso = smoothRange(.395, .535, py)
+            * smoothRange(left, left + .070, px)
+            * (1 - smoothRange(right - .070, right, px));
+          const region = Math.max(neck, torso);
+          if (region < .003) continue;
 
-      // Mer koncentrerad gyllene kärna runt bröstpartiet.
-      const coreX = box.x + box.w * .50;
-      const coreY = box.y + box.h * .64;
-      const goldCore = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, box.w * .30);
-      goldCore.addColorStop(0, 'rgba(255, 214, 138, 0.34)');
-      goldCore.addColorStop(.24, 'rgba(255, 196, 102, 0.28)');
-      goldCore.addColorStop(.54, 'rgba(255, 173, 72, 0.16)');
-      goldCore.addColorStop(1, 'rgba(255, 173, 72, 0)');
-      ctx.fillStyle = goldCore;
-      ctx.fillRect(coreX - box.w * .34, coreY - box.w * .34, box.w * .68, box.w * .68);
+          const r = pixels[index] / 255;
+          const g = pixels[index + 1] / 255;
+          const b = pixels[index + 2] / 255;
+          const value = Math.max(r, g, b);
+          const low = Math.min(r, g, b);
+          const diff = value - low;
+          if (diff < .08 || value < .14) continue;
+          const saturation = diff / Math.max(value, .001);
 
-      // Diskreta gyllene sidoglöd över axelpartiet, utan ny lila ton på kroppen.
-      glowAt(box.x + box.w * .31, box.y + box.h * .46, box.w * .12, '255,181,84', .07 + .02 * Math.sin(t * 1.1));
-      glowAt(box.x + box.w * .69, box.y + box.h * .46, box.w * .12, '255,181,84', .07 + .02 * Math.sin(t * 1.1 + 1.4));
-      glowAt(coreX, coreY, box.w * .20, '255,199,116', .09 + .02 * Math.sin(t * 1.4 + .4));
+          // Ursprungliga orange/gula streck behåller sina färger.
+          let hue;
+          if (value === r) hue = ((g - b) / diff + 6) % 6;
+          else if (value === g) hue = (b - r) / diff + 2;
+          else hue = (r - g) / diff + 4;
+          hue *= 60;
+          if (hue < 248 || hue > 359) continue;
 
-      // Extra mjuk värme längst ned på kroppen så helheten blir mindre rosa.
-      ctx.globalCompositeOperation = 'soft-light';
-      const lowerWarmth = ctx.createLinearGradient(box.x, box.y + box.h * .52, box.x, box.y + box.h);
-      lowerWarmth.addColorStop(0, 'rgba(255, 160, 72, 0)');
-      lowerWarmth.addColorStop(.65, 'rgba(255, 154, 56, 0.12)');
-      lowerWarmth.addColorStop(1, 'rgba(255, 146, 44, 0.22)');
-      ctx.fillStyle = lowerWarmth;
-      ctx.fillRect(box.x, box.y, box.w, box.h);
+          // Ändra bara synliga, ljusa färgspår; svaga mörka partier
+          // och nebulosabakgrund lämnas mycket nära sin originalfärg.
+          const bright = smoothRange(.16, .50, value);
+          const chroma = smoothRange(.16, .52, saturation);
+          const visible = smoothRange(.55, .98, alpha);
+          const amount = region * bright * chroma * visible * .95;
+          if (amount < .003) continue;
 
-      ctx.restore();
-      ctx.globalCompositeOperation = 'source-over';
+          // HSV med guldton (37°), ursprunglig ljusstyrka och bevarad alfa.
+          const targetSaturation = Math.max(.55, saturation * .89);
+          const targetHue = 37 / 60;
+          const c = value * targetSaturation;
+          const xh = c * (1 - Math.abs(targetHue % 2 - 1));
+          const m = value - c;
+          const goldR = c + m;
+          const goldG = xh + m;
+          const goldB = m;
+          pixels[index]     = Math.round((r + (goldR - r) * amount) * 255);
+          pixels[index + 1] = Math.round((g + (goldG - g) * amount) * 255);
+          pixels[index + 2] = Math.round((b + (goldB - b) * amount) * 255);
+        }
+      }
+      bctx.putImageData(bitmap, 0, 0);
+      return buffer;
     }
 
     // 11. Bakgrund: violett dimma, diskreta våglinjer och glittrande stjärnor.
@@ -542,6 +559,10 @@
     }
     function drawPortrait(t, box) {
       if (!portrait.complete || !portrait.naturalWidth) return;
+      // Färgkorrigeringen görs en enda gång på porträttets pixlar, aldrig
+      // som ett halvtransparent färgfält över det färdiga fönstret.
+      if (!goldPortrait) goldPortrait = createGoldPortrait(portrait);
+      const portraitForDrawing = goldPortrait || portrait;
       // Huvudets textur omprojiceras i perspektiv; resten av porträttet ändras inte.
       if (!headRendererChecked) {
         headRendererChecked = true;
@@ -556,12 +577,12 @@
       let movingPortrait = null;
       if (headRenderer) {
         try {
-          movingPortrait = headRenderer.draw(portrait, headLook.x, headLook.y);
+          movingPortrait = headRenderer.draw(portraitForDrawing, headLook.x, headLook.y);
           if (!movingPortrait) {
             // Återställ funktionen om WebGL-kontexten har försvunnit.
             headRenderer = createCanvasHeadRenderer();
             movingPortrait = headRenderer
-              ? headRenderer.draw(portrait, headLook.x, headLook.y) : null;
+              ? headRenderer.draw(portraitForDrawing, headLook.x, headLook.y) : null;
           }
         } catch (error) {
           console.warn('Grafikmotorn kunde inte rita huvudet; använder originalbild.', error);
@@ -569,7 +590,7 @@
           // Avataren visas fortfarande även om huvudeffekten inte kan starta.
         }
       }
-      ctx.drawImage(movingPortrait || portrait, box.x, box.y, box.w, box.h);
+      ctx.drawImage(movingPortrait || portraitForDrawing, box.x, box.y, box.w, box.h);
       if (glowImage.complete && glowImage.naturalWidth) {
         ctx.globalCompositeOperation = 'screen';
         ctx.globalAlpha = .10 + .09*(.5+.5*Math.sin(t*1.65));
@@ -577,7 +598,6 @@
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
       }
-      applyBodyRecolor(box, t);
     }
 
     // 13. Ljuspunkterna i pannan och bröstet pulserar i olika takt.
@@ -673,16 +693,9 @@
       const t = (performance.now() - startTime) / 1000;
       const box = heroGeometry(t);
       const f = headTransform(.501, .160);
-      const forehead = { x: box.x + f.x * box.w, y: box.y + f.y * box.h };
-      const chest = { x: box.x + box.w * .501, y: box.y + box.h * .620 };
+      // Blixten ska alltid komma från punkten i pannan.
+      const from = { x: box.x + f.x * box.w, y: box.y + f.y * box.h };
       const target = { x: event.clientX, y: event.clientY };
-      const origin = Math.hypot(target.x - forehead.x, target.y - forehead.y)
-        < Math.hypot(target.x - chest.x, target.y - chest.y) ? forehead : chest;
-      let from = origin;
-      // Korta klick nära en energikärna ger ändå en synlig blixt.
-      if (Math.hypot(target.x - from.x, target.y - from.y) < 40) {
-        from = { x: origin.x - 80, y: origin.y - 85 };
-      }
       const main = lightningPath(from, target, .18);
       const branches = [];
       for (let i = 0; i < 5; i++) {
